@@ -1,0 +1,379 @@
+---
+title: "IST 707 Project"
+author: "Katherine Hurtado-da Silva"
+date: "12/3/2021"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+---
+
+# Introduction
+
+Employee retention is an important factor in any organization's success, irregardless of it's possible non-business entity. The Business Journal reported that "retaining existing talent" was rated as the top management challenge by 79% of CEOs and that 67 % of CEOs reported "attracting qualified talent" as a top concern (Galvin, 2019). Unfortunately, attrition has not only persisted but escalated dramatically during the pandemic. In what is now being referred to as the Great Resignation, a record-high of 4.4 million people quit their jobs in September of this year (Smart, 2021). Aside from the negative impact on team morale, attrition also has adverse monetary ramifications. CEOs can expect to pay about 33% of an employee's annual salary to account for recruiters, advertisement, reference checks, pre-employment tests, on-boarding and training (Hall, 2019). This figure doesn't even consider signing bonuses, other recruitment incentives, or costs associated with ensuring someone is temporarily fulfilling the responsibilities of the departing team member(s). These estimated costs can quickly accumulate if the turnover rate persists and more than justifies the importance of CEOs exploring what influences attrition and effective recruitment, for the sake of optimizing employee retention and overall organizational success. As a result, Random Forest and SVM will be used to predict attrition using the data points shared in the IBM HR data set.
+
+# Analysis and Model(s)- About the Data
+
+The IBM HR data set includes 1,470 employee records with 35 attributes. The summary command offered the five-number summary for attributes with integer data points and a count of each factor for string attributes. While reviewing all of the attributes, it was determined that the daily rate, hourly rate, monthly rate, employee count, employee number, job level, over18, and standard hours would be omitted since the information did not add value to the analysis at hand. Since the data set had no missing values, no further omissions were necessary. Lastly, eight attributes that were included in the data set as integers needed to be changed to factors to indicate it is categorical data.
+
+```{r, echo=FALSE,results="hide"}
+library(dplyr)
+
+```
+
+```{r,echo=FALSE,results="hide"}
+filename <-"/Users/hurtado/Desktop/WA_Fn-UseC_-HR-Employee-Attrition (1).csv"
+HRTotalDF <- read.csv(filename, header = TRUE, stringsAsFactors = TRUE)
+str(HRTotalDF)
+
+```
+
+```{r, echo=FALSE,results="hide"}
+apply(is.na(HRTotalDF), 2, sum)
+
+```
+
+```{r, echo=FALSE,results="hide"}
+HRNewDF<-HRTotalDF
+HRNewDF$DailyRate<- NULL
+HRNewDF$HourlyRate<- NULL
+HRNewDF$MonthlyRate<- NULL
+HRNewDF$EmployeeCount<- NULL
+HRNewDF$EmployeeNumber<- NULL
+HRNewDF$JobLevel<- NULL
+HRNewDF$Over18<- NULL
+HRNewDF$StandardHours<- NULL
+```
+
+```{r, echo=FALSE,results="hide"}
+HRNewDF$Education <- as.factor(HRNewDF$Education)
+HRNewDF$EnvironmentSatisfaction <- as.factor(HRNewDF$EnvironmentSatisfaction)
+HRNewDF$JobInvolvement <- as.factor(HRNewDF$JobInvolvement)
+HRNewDF$JobSatisfaction <- as.factor(HRNewDF$JobSatisfaction)
+HRNewDF$PerformanceRating <- as.factor(HRNewDF$PerformanceRating)
+HRNewDF$RelationshipSatisfaction <- as.factor(HRNewDF$RelationshipSatisfaction)
+HRNewDF$StockOptionLevel <- as.factor(HRNewDF$StockOptionLevel)
+HRNewDF$WorkLifeBalance <- as.factor(HRNewDF$WorkLifeBalance)
+HRNewDF
+```
+
+Figure 1 shows the overall attrition count, using the probability table command, it is shown that there is an existing 16% attrition rate.
+
+```{r}
+library(ggplot2)
+HRNewDF %>%
+        group_by(Attrition) %>%
+        tally() %>%
+        ggplot(aes(x = Attrition, y = n,fill=Attrition)) +
+        geom_bar(stat = "identity") +
+        theme_minimal()+
+        labs(x="Attrition Status", y="Quantity")+
+        ggtitle("Attrition Count")+theme(plot.title = element_text(hjust = 0.5))+
+        geom_text(aes(label = n), vjust = -0.5, position = position_dodge(0.9))
+
+prop.table(table(HRNewDF$Attrition))
+```
+
+Box plots were used to explore trends relating to attrition and continuous attributes. Figure 2 shows that the median age for employees that left was slightly younger than the population of employees who remain working at this company. There were two outliers, around the age of 56 and 57, that left their jobs. Although one could speculate it could be due to retirement, that notion could be disputed by the fact that the age range of employees who remain working at the company reaches the age 60 (older than the two outliers in the attrition box plot) and are not considered outliers. The reasoning for their departure would be worth exploring to see the factors that led to this early and uncommon departure. Given the general proximity of age range for existing and previous employees, age might not be a contributing factor to attrition.
+
+```{r}
+plot(HRNewDF$Attrition, HRNewDF$Age, main = "Employee Age & Attrition", ylab = "Employee Age", xlab = "Attrition") 
+
+```
+
+The median for distance from home is slightly higher for employees who left the company. In spite of both box plots showing the same range for distance between those who remain and those who left, it is worth noting 75% of employees that continue to work, live within 14 miles from the company. There is only a two mile increase for the 3rd quartile in distance for the attrition box plot, indicating this is unlikely to be a determining influence on leaving the company.
+
+```{r}
+plot(HRNewDF$Attrition, HRNewDF$DistanceFromHome, main = "Distance from Home & Attrition", ylab = "Distance", xlab = "Attrition") 
+
+```
+
+Monthly income for former employees does appear to have a significant delta, compared to employees that remain at the company. 75% of former employees earned around \$6,000 or less, a monetary benchmark that is representative of 50% of remaining employees. Generally speaking, the group of exiting employees are on the lower earning scale, having the monthly income range capping at around \$11,000. The box plot shows that out of the current employees, there are many outliers making significantly more than the majority of the workforce. In spite of the attrition box plot also showed outliers leaving while being on the high grossing end of the plot, it can be concluded that monthly income may be a contributing factor to attrition.
+
+```{r}
+plot(HRNewDF$Attrition, HRNewDF$MonthlyIncome, main = "Monthly Income & Attrition", ylab = "Monthly Income", xlab = "Attrition") 
+
+```
+
+Although the median number of previous jobs for former employees was 1, the upper 50% ranged from 1 to approximately 9. On the other hand, the median number of former jobs for current employees is 2, and the upper 50% ranged from this to 8. Ironically, there is an outlier with about 9 previous jobs that is still working at the company. Based on the attrition box plot to the right, one can't help but wonder if they will eventually leave, further supporting the findings of this existing plot. Although the differences in values aren't too significant, the overall trend indicates that the employees who left, tend to have more former employments than the ones remaining at the company.
+
+```{r}
+plot(HRNewDF$Attrition, HRNewDF$NumCompaniesWorked, main = "Number of Previous Employments & Attrition", ylab = "Quantity", xlab = "Attrition") 
+
+```
+
+The upper 50% for percent salary increase is where the differences between current and former employees exists. The lower half of both current and former employees received a median increase of 14%. The upper 50% varies by percent, not too significant. However, there is an outlier that received a 24% salary increase, but left the company. Although this is one instance, the reasoning may be connected to the outliers receiving some of the outlying higher monthly incomes, but decided to leave as well.
+
+```{r}
+plot(HRNewDF$Attrition, HRNewDF$PercentSalaryHike, main = "Percent Salary Increase & Attrition", ylab = "Percent Increase", xlab = "Attrition") 
+
+```
+
+Although the median years of total experience is varies by 1 year, ex experience ranged from 0-20 for former employees, while current employees ranged from 0-30. Both box plots show outliers, indicating there are about 6 employees that continue to work at the company with 31+ years of experience. Unfortunately, there are also outliers on the attrition box plot, showing there were 11 uncommon cases of employees with 21+ years of experience leaving the company.
+
+```{r}
+plot(HRNewDF$Attrition, HRNewDF$TotalWorkingYears, main = "Total Years of Experience & Attrition", ylab = "Total Years", xlab = "Attrition") 
+
+```
+
+Tenure in the company indicates the 50% of employees that leave tend to do so within the first 3 years of employment. The next benchmark indicates 75% of employees tend to leave at 9 year mark and that the upper 25% of former employees ranged from having 9-18 years in the company. 50% of current employees tend to have about 8 years at the company, and 75% of all current employees have 10 years or less. The upper 25% of employees typically go on to reach 20 years of service. In both cases, there are multiple outliers with 18+ years of service in the company that both remain and left.
+
+```{r}
+plot(HRNewDF$Attrition, HRNewDF$YearsAtCompany, main = "Tenure at Current Company & Attrition", ylab = "Years of Employment", xlab = "Attrition") 
+
+```
+
+Although the box plots have the same range, 50% of former employees has 1 or no training experiences, while 50% the remaining employees had 3 or less. Outliers aside, th box plots indicate insufficient training may contribute to attrition.
+
+```{r}
+plot(HRNewDF$Attrition, HRNewDF$TrainingTimesLastYear, main = "Training  & Attrition", ylab = "Number of Training Events", xlab = "Attrition") 
+
+```
+
+The attrition box plot shows the median number of years in their current role was 3, where 50% ranged from 0 to 4 years. The upper 25% ranged from4 to 10 years. Generally speaking, shorter tenures in current roles appeared to be a trend connected to attrition.
+
+```{r}
+plot(HRNewDF$Attrition, HRNewDF$YearsInCurrentRole, main = "Time in Current Role & Attrition", ylab = "Years in Position", xlab = "Attrition") 
+
+```
+
+The attrition box plot shows the median number of years since the respective employee's last promotion is 1 year. This is the same for current employees. Although the remaining range for previous employees appears to be shorter than those currently at the company, this may be due to their decision to leave, hence not staying long enough to experience longer periods in between promotions. The outliers support this notion, showing they may have left due to how long it appears to take to get promoted within the company (6-15 years).
+
+```{r}
+plot(HRNewDF$Attrition, HRNewDF$YearsSinceLastPromotion, main = "Number of Years Since Last Promotion & Attrition", ylab = "Number of Years", xlab = "Attrition") 
+
+```
+
+Lastly, exiting employees tend to have shorter service years with the manager they had when they left. Current employees had a median number of 3 years with their current manager, where the upper 25% of employees range from 7-14 years. The attrition box plot, also shows the upper 25% of former employees ranged from 5-11 years under the same manager. Both findings indicate the reason for leaving may not be related to discontent, rather timely career moves.
+
+```{r}
+plot(HRNewDF$Attrition, HRNewDF$YearsWithCurrManager, main = "Number of Years with Current Manager & Attrition", ylab = "Number of Years", xlab = "Attrition") 
+
+```
+
+Bar plots were used to compare trends relating to attrition for the categorical attributes of the data set. Business Travel,
+
+```{r, echo=FALSE,results="hide"}
+TravelPlot <- ggplot(HRNewDF,aes(BusinessTravel,fill=Attrition))+geom_bar()
+DepartmentPlot <- ggplot(HRNewDF,aes(Department,fill = Attrition))+geom_bar()
+EducationPlot <- ggplot(HRNewDF,aes(Education,fill=Attrition))+geom_bar()
+EducationField <- ggplot(HRNewDF,aes(EducationField,fill=Attrition))+geom_bar()
+EnvironmentPlot <- ggplot(HRNewDF,aes(EnvironmentSatisfaction,fill=Attrition))+geom_bar()
+GenderPlot <- ggplot(HRNewDF,aes(Gender,fill=Attrition))+geom_bar()
+InvolvementPlot <- ggplot(HRNewDF,aes(JobInvolvement,fill=Attrition))+geom_bar()
+JobRolePlot <- ggplot(HRNewDF,aes(JobRole,fill=Attrition))+geom_bar()
+JobSatisfactionPlot <- ggplot(HRNewDF,aes(JobSatisfaction,fill=Attrition))+geom_bar()
+MaritalStatusPlot <- ggplot(HRNewDF,aes(MaritalStatus,fill=Attrition))+geom_bar()
+OverTimePlot <- ggplot(HRNewDF,aes(OverTime,fill=Attrition))+geom_bar()
+PerformanceRatingPlot <- ggplot(HRNewDF,aes(PerformanceRating,fill=Attrition))+geom_bar()
+RelationshipSatisfactionPlot <- ggplot(HRNewDF,aes(RelationshipSatisfaction,fill=Attrition))+geom_bar()
+StockOptionLevelPlot <- ggplot(HRNewDF,aes(StockOptionLevel,fill=Attrition))+geom_bar()
+WorkLifeBalancePlot <- ggplot(HRNewDF,aes(WorkLifeBalance,fill=Attrition))+geom_bar()
+
+```
+
+```{r}
+TravelPlot 
+prop.table(table(HRNewDF$BusinessTravel,HRNewDF$Attrition))
+```
+
+```{r}
+DepartmentPlot 
+prop.table(table(HRNewDF$Department,HRNewDF$Attrition))
+```
+
+```{r}
+EducationPlot
+prop.table(table(HRNewDF$Education,HRNewDF$Attrition))
+
+```
+
+```{r}
+EducationField
+prop.table(table(HRNewDF$EducationField,HRNewDF$Attrition))
+
+```
+
+```{r}
+EnvironmentPlot 
+prop.table(table(HRNewDF$EnvironmentSatisfaction,HRNewDF$Attrition))
+
+```
+
+```{r}
+GenderPlot
+prop.table(table(HRNewDF$Gender,HRNewDF$Attrition))
+
+```
+
+```{r}
+InvolvementPlot
+prop.table(table(HRNewDF$JobInvolvement,HRNewDF$Attrition))
+
+```
+
+```{r}
+JobRolePlot 
+prop.table(table(HRNewDF$JobRole,HRNewDF$Attrition))
+```
+
+```{r}
+JobSatisfactionPlot 
+prop.table(table(HRNewDF$JobSatisfaction,HRNewDF$Attrition))
+```
+
+```{r}
+MaritalStatusPlot
+prop.table(table(HRNewDF$MaritalStatus,HRNewDF$Attrition))
+```
+
+```{r}
+OverTimePlot
+prop.table(table(HRNewDF$OverTime,HRNewDF$Attrition))
+
+```
+
+```{r}
+PerformanceRatingPlot 
+prop.table(table(HRNewDF$PerformanceRating,HRNewDF$Attrition))
+
+```
+
+```{r}
+RelationshipSatisfactionPlot 
+prop.table(table(HRNewDF$RelationshipSatisfaction,HRNewDF$Attrition))
+
+```
+
+```{r}
+StockOptionLevelPlot
+prop.table(table(HRNewDF$StockOptionLevel,HRNewDF$Attrition))
+
+```
+
+```{r}
+WorkLifeBalancePlot 
+prop.table(table(HRNewDF$WorkLifeBalance,HRNewDF$Attrition))
+
+```
+
+# Analysis and Model(s): Random Forest & SVM
+
+The data set was divided into two sets with a set seed of 10, 80% was randomly sampled into the train data set and 20% into the test data set. The set seed is necessary to produce the same random sample and to ensure the results are replicable. The resulting training and testing sets had 1,176 and 294 data points, respectively. Default tuning parameters were set to facilitate a comparisons between the two classification algorithms. Furthermore, the data was trained using the k-Fold Cross-Validation to determine how reliable each algorithm is. All of the algorithms were run with a cross validation of 6 and tunelength of 5, meaning there will be 6 randomly created subsets and that the best of 5 mtry values (number of variables randomly sampled as candidates at each split) will be selected. K=6 was selected since it is a factor of the training set size.
+
+The first classification algorithm that will be used is Random Forest, an ensemble learning technique that creates many trees on the subset of the data and combines all of the outputs. This technique reduces overfitting, variance, and improves accuracy. Furthermore Random Forest does not require normalization and can handle outliers easily. Due to the stability of the algorithm, it can be used with the data set as it currently is, even though the EDA revealed further data transformation was needed to address outliers. Lastly, the HR data set is composed of both categorical and continuous attributes, variables that Random Forest also happens to work well with.
+
+```{r, echo=FALSE,results="hide"}
+library(caret)
+set.seed(10)
+index <- sample(nrow(HRNewDF), nrow(HRNewDF)*0.8)
+HRNew_train <- HRNewDF[index, ]
+HRNew_test <- HRNewDF[-index,]
+
+
+```
+
+```{r, echo=FALSE,results="hide"}
+# Creating a control with cross validation of 6
+control <- trainControl(method ='cv',number = 6)
+
+# Metric for comparison will be accuracy for this project
+metric <-  "Accuracy"
+
+```
+
+```{r, echo=FALSE,results="hide"}
+set.seed(10)
+rf.model <- train(Attrition ~ ., data = HRNew_train, method="rf", metric=metric, trControl=control,tuneLength = 5)
+```
+
+Support vector machine (SVM) is another supervised machine learning model that uses a decision boundary in the form of a line or hyperplane that best separates the data points. Anything that falls within each side of the line or plane is classified as its own group. The best hyperplane, will be the one that maximizes the margins from both groups. Although SVM tends to have high accuracy, it is not known for handling large data sets well. Also, it handles sparse data better, which is not the case with this data set. It will be interesting to see which of the two algorithms result with a higher accuracy rate considering its varying pros and cons.
+
+```{r, echo=FALSE,results="hide"}
+set.seed(10)
+svm.model <- train(Attrition ~ ., data = HRNew_train, method="svmRadial",metric=metric,trControl=control,tuneLength = 5)
+
+```
+
+# Results
+
+Random forest's mtry value is the number associated with a specific tree. The outputs below indicate that decision tree number 15 had the highest accuracy at 84.7%. The accuracy value appears to be within 1% of the optimal model's results. No dramatic differences resulted across different mtry values.
+
+```{r}
+# Accuracy of Random Forest Model
+print(rf.model)
+
+# Plotting random forest model
+plot(rf.model)
+
+# mtry = 15 is the final model, therefore taking accuracy value from it
+rf_acc = 84.7
+Accuracy <- data.frame(rf_acc)
+
+```
+
+When using SVM, the final value being used was C=4 with an associated 87.5% accuracy. When comparing it with the lower cost solution of c = 2, there seems to be about .3% difference in the accuracy. Accuracy decreases anywhere from 2-5% when c decreases to .25, .50, and 1.
+
+```{r}
+# Accuracy of Support Vector Machine (SVM)
+print(svm.model)
+
+# Plotting Support Vector Machine Model
+plot(svm.model)
+
+svm_acc = 87.5
+Accuracy <- data.frame(cbind(Accuracy,svm_acc))
+
+```
+
+The following diagram shows the accuracy for each algorithm that has already been addressed. However, Kappa, a value used to assess the precision of the algorithm, is low for both SVM and Random Forest. Since its calculation is based on the confusion matrix, it was generated below to look at other associated parameters. The confusion matrix shows the accuracy increased to 90% for SVM. Random Forest's accuracy also improved to 89%. Since Kappa takes imbalance into account, it was expected to see a disparity between the accuracy and Kappa measures. The Kappa value of 46% for SVM and 31% for Random Forest was not a surprise considering the data was not normalized prior to implementing the classification algorithms. However, since the reliability of the algorithm is being determined by the accuracy measure, it will simply be noted.
+
+```{r}
+results <- resamples(list(Random_Forest=rf.model,SVM=svm.model))
+dotplot(results)
+
+```
+
+```{r, echo=FALSE,results="hide"}
+# Prediction on the test data using svm
+svm <- predict(svm.model, HRNew_test)
+
+
+```
+
+```{r, echo=FALSE,results="hide"}
+# Prediction on the test data using random forest
+random_forest <- predict(rf.model, HRNew_test)
+
+
+```
+
+```{r}
+confusionMatrix(svm, HRNew_test$Attrition, positive = "Yes")
+
+```
+
+```{r}
+confusionMatrix(random_forest, HRNew_test$Attrition, positive = "Yes")
+
+```
+
+# Conclusion
+
+Ultimately, both algorithms resulted in having favorable accuracy measures. However, if there was a desire to achieve higher accuracy levels, the data set could be normalized or over sampled to address the outliers and general imbalance. Considering SVM's success with running an un-scaled data set, its results could improve significantly more with this additional pre-processing step. Another strategy that could increase the viability of the algorithms, involves the use of Principal Component Analysis (PCA). Although attributes that did not add value to the data set were omitted, further removals could occur if strong correlations between attributes were unveiled.
+
+Random Forest was expected to outperform SVM due to its ability to handle imbalanced, continuous and categorical data. The data set was not normalized in order to compare the effectiveness of each classifier equally. Surprisingly enough, SVM lived up to its reputation and ended up being the better of the two in spite of the un-scaled and large data set. In terms of theory versus practice, it was relieving to see the confusion matrix report higher performance accuracy measures for each algorithm. With a performance accuracy level of 90%, SVM would be selected as the main algorithm of use for any C-suite leader interested in predicting whether there is a risk of losing an employee.
+
+# References
+
+Galvin,
+J. (2019, November 11). *The new CEO battleground: Retaining talent,* The
+Business Journals. <https://www.bizjournals.com/bizjournals/news/2019/11/11/the-new-ceo-battleground-retaining-talent.html>
+
+Smart,
+T. (2021, November 12). *Number of People Quitting Their Jobs Hits Record 44
+Million*. U.S. News. <https://www.usnews.com/news/economy/articles/2021-11-12/number-of-people-quitting-their-jobs-hits-record-44-million>
+
+Hall,
+J. (2019, May 09). *The Cost of Turnover Can Kill Your Business and Make
+Things Less Fun*. Forbes. <https://www.forbes.com/sites/johnhall/2019/05/09/the-cost-of-turnover-can-kill-your-business-and-make-things-less-fun/?sh=5810b9b27943>
